@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "eMaktab’da bolani qo‘shish",
+        "description": "eMaktab elektron kundaligiga ulanish uchun ma’lumotlarni kiriting.",
+        "data": {
+          "name": "Bolaning ismi",
+          "username": "Login",
+          "password": "Parol",
+          "person_id": "O‘quvchi identifikatori (Person ID)",
+          "school_id": "Maktab identifikatori (School ID)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "eMaktab bilan ulanish amalga oshmadi",
+      "invalid_auth": "Kirish ma’lumotlari noto‘g‘ri",
+      "unknown": "Noma’lum xatolik yuz berdi"
+    }
+  }
+}
