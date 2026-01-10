@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Добавление ребёнка eMaktab",
+        "description": "Укажите данные для подключения к электронному дневнику eMaktab.",
+        "data": {
+          "name": "Имя ребёнка",
+          "username": "Логин",
+          "password": "Пароль",
+          "person_id": "Идентификатор ученика (Person ID)",
+          "school_id": "Идентификатор школы (School ID)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось установить соединение с eMaktab",
+      "invalid_auth": "Неверные данные для входа",
+      "unknown": "Произошла неизвестная ошибка"
+    }
+  }
+}
