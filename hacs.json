@@ -1,7 +1,6 @@
 {
   "name": "eMaktab",
   "content_in_root": false,
-  "domains": ["emaktab"],
-  "country": ["UZ"],
-  "iot_class": "cloud_polling"
+  "country": ["UZ"]
 }
+
