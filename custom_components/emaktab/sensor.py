@@ -38,10 +38,10 @@ def _select_relevant_day(days: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not days:
         return None
 
-    # today = datetime.now(timezone.utc).date()
+    today = datetime.now(timezone.utc).date()
     
     # ВРЕМЕННО: фиксированная дата для тестирования (учебный день)
-    today = datetime(2025, 11, 13, tzinfo=timezone.utc).date()
+    # today = datetime(2025, 11, 13, tzinfo=timezone.utc).date()
 
     for day in days:
         try:
