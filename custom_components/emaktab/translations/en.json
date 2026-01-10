@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add eMaktab Child",
+        "description": "Enter the details to connect to the eMaktab electronic diary.",
+        "data": {
+          "name": "Child name",
+          "username": "Username",
+          "password": "Password",
+          "person_id": "Student identifier (Person ID)",
+          "school_id": "School identifier (School ID)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to eMaktab",
+      "invalid_auth": "Invalid login credentials",
+      "unknown": "An unknown error occurred"
+    }
+  }
+}
