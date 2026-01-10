@@ -1,7 +1,7 @@
 {
   "domain": "emaktab",
   "name": "eMaktab (Electronic Diary)",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "config_flow": true,
   "documentation": "https://github.com/lavalex2003/emaktab",
   "issue_tracker": "https://github.com/lavalex2003/emaktab/issues",
