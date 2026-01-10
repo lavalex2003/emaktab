@@ -1,62 +1,96 @@
 # eMaktab for Home Assistant
 
-интеграция Home Assistant для электронного дневника **emaktab.uz**.
+Custom (unofficial) Home Assistant integration for the **eMaktab** electronic diary service.
 
-## Возможности
+This integration allows you to access school day information, lessons, and daily average marks directly in Home Assistant.
 
-- Получение данных школьного дня
-- Нормализованные уроки:
-  - предмет
-  - тема
-  - домашнее задание
-  - оценка
-- Расчёт среднего балла за день
-- Поддержка нескольких детей
-- Настройка через UI Home Assistant
+---
 
-## Установка
+## Disclaimer
 
-### Через HACS (рекомендуется)
-1. Добавьте репозиторий как Custom Repository
-2. Установите интеграцию **eMaktab**
-3. Перезапустите Home Assistant
+This integration is **not affiliated with, endorsed by, or connected to eMaktab or its developers**.  
+It is an independent, community-developed project.
 
-### Вручную
-Скопируйте папку `emaktab` в config/custom_components/
+---
 
-## Настройка
+## Features
 
-1. Откройте **Настройки → Интеграции**
-2. Нажмите **Добавить интеграцию**
-3. Выберите **eMaktab**
-4. Введите данные ребёнка:
-   - логин
-   - пароль
-   - person_id
-   - school_id
+- School day data retrieval
+- Normalized lessons data:
+  - subject
+  - topic
+  - homework
+  - mark
+- Daily average mark calculation
+- Support for multiple children
+- Configuration via Home Assistant UI (Config Flow)
+- Designed for automations and voice assistants
 
-  Чтобы узнать person_id и school_id необходимо открыть сайт emaktab.uz, Войти в систему, откртыь DevTools, вкладка network установить филтр на fetch/XHR. Обновить страницу. Первый же запрос /links, в строке запроса и в теле ответа будет необходимын данные. 
+---
 
-Можно добавить несколько детей.
+## Installation
 
-## Создаваемые сущности
+### Via HACS (recommended)
 
-### School Day
-- Дата учебного дня
-- Все уроки в нормализованном JSON
+1. Open **HACS** in Home Assistant
+2. Go to **Integrations**
+3. Click **Add Custom Repository**
+4. Add this repository URL and select **Integration**
+5. Search for **eMaktab** and install it
+6. Restart Home Assistant
 
-### Average Mark
-- Средний балл за день
-- `0`, если нет оценок или каникулы
+---
 
-### Update eMaktab Data
-- Обновление данных сенсоров
+## Configuration
 
-## Примечания
+Configuration is done entirely through the Home Assistant UI.
 
-- Интеграция использует неофициальные API eMaktab
-- Возможны изменения со стороны сервиса
-- Используйте на свой страх и риск
+During setup, the following data is required:
 
-## Лицензия
-MIT
+- eMaktab login
+- eMaktab password
+- `person_id`
+- `school_id`
+
+If multiple children are available, you can create multiple configuration entries.
+
+> ℹ️ The required identifiers are provided by the eMaktab service for each student.
+
+---
+
+## Entities
+
+### Sensor: School Day
+
+- State: current school day date
+- Attributes include:
+  - lessons (normalized data)
+  - student information
+  - source metadata
+
+---
+
+### Sensor: Average Mark
+
+- State: average mark for the current school day
+- Returns `0` if there are no marks or during holidays
+
+---
+
+### Button: Update eMaktab Data
+
+- Forces an immediate update of all configured eMaktab entries
+
+---
+
+## Notes
+
+- This integration relies on the eMaktab web service and may stop working if the service changes
+- No official API is used
+- Data is retrieved using authenticated web sessions
+
+---
+
+## License
+
+MIT License
