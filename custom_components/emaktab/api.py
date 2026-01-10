@@ -44,12 +44,12 @@ class EmaktabApiClient:
 
         url = f"{BASE_URL}/api/v2/marks/diary"
 
-        #now = datetime.now(timezone.utc)
-        #start_ts, finish_ts = self._week_range_utc(now)
+        now = datetime.now(timezone.utc)
+        start_ts, finish_ts = self._week_range_utc(now)
         
         # ВРЕМЕННО: фиксированная учебная дата для тестирования
-        now = datetime(2025, 11, 13, tzinfo=timezone.utc)
-        start_ts, finish_ts = self._week_range_utc(now)
+        #now = datetime(2025, 11, 13, tzinfo=timezone.utc)
+        #start_ts, finish_ts = self._week_range_utc(now)
 
         params = {
             "personId": person_id,
