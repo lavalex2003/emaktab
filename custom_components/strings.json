@@ -1,0 +1,26 @@
+{
+  "title": "eMaktab",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Добавить ребёнка (eMaktab)",
+        "description": "Введите данные для доступа к электронному дневнику eMaktab.",
+        "data": {
+          "name": "Имя ребёнка",
+          "username": "Логин",
+          "password": "Пароль",
+          "person_id": "Person ID",
+          "school_id": "School ID"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к eMaktab",
+      "invalid_auth": "Неверный логин или пароль",
+      "unknown": "Неизвестная ошибка"
+    },
+    "abort": {
+      "already_configured": "Этот ребёнок уже добавлен"
+    }
+  }
+}
