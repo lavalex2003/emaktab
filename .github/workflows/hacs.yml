@@ -1,4 +1,17 @@
-{
-  "name": "eMaktab",
-  "content_in_root": false
-}
+name: HACS
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands
