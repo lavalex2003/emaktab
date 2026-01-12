@@ -1,12 +1,12 @@
 {
   "domain": "emaktab",
   "name": "eMaktab (Electronic Diary)",
-  "version": "1.0.6",
+  "codeowners": ["@lavalex2003"],
   "config_flow": true,
   "documentation": "https://github.com/lavalex2003/emaktab",
-  "issue_tracker": "https://github.com/lavalex2003/emaktab/issues",
-  "codeowners": ["@lavalex2003"],
-  "iot_class": "cloud_polling",
   "integration_type": "service",
-  "requirements": []
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/lavalex2003/emaktab/issues",
+  "requirements": [],
+  "version": "1.0.6"
 }
