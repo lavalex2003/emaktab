@@ -1,3 +1,10 @@
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/lavalex2003/emaktab)](https://github.com/lavalex2003/emaktab/releases)
+[![downloads](https://img.shields.io/github/downloads/lavalex2003/emaktab/total)](https://github.com/lavalex2003/emaktab/releases)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6%2B-blue)
+![CI](https://github.com/lavalex2003/emaktab/actions/workflows/hassfest.yml/badge.svg)
+
+
 # eMaktab for Home Assistant
 
 Custom (unofficial) Home Assistant integration for the **eMaktab** electronic diary service.
@@ -34,10 +41,13 @@ It is an independent, community-developed project.
 
 1. Open **HACS** in Home Assistant
 2. Go to **Integrations**
-3. Click **Add Custom Repository**
-4. Add this repository URL and select **Integration**
-5. Search for **eMaktab** and install it
-6. Restart Home Assistant
+3. Search for **eMaktab** and install it
+4. Restart Home Assistant
+
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=lavalex2003&repository=emaktab)
+
+> After installation, the integration will appear automatically in
+> **Settings → Devices & Services → Add Integration**
 
 ---
 
@@ -80,6 +90,16 @@ If multiple children are available, you can create multiple configuration entrie
 ### Button: Update eMaktab Data
 
 - Forces an immediate update of all configured eMaktab entries
+
+---
+
+## Support
+
+If you encounter issues:
+
+- Open a GitHub issue
+- Include logs
+- Describe your Home Assistant version
 
 ---
 
