@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -39,7 +39,7 @@ class EmaktabCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=None,  # интервал уже задан ранее через timedelta в предыдущих правках
+            update_interval=timedelta(seconds=scan_interval),
         )
 
         # Хранилище состояния
