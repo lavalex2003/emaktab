@@ -67,6 +67,16 @@ class EmaktabApiClient:
         )
 
         try:
+            return await self._async_request_diary(url, params)
+        except aiohttp.ClientError as err:
+            _LOGGER.error("HTTP error during diary API request: %s", err)
+            raise
+
+    async def _async_request_diary(
+        self, url: str, params: dict[str, str | int]
+    ) -> dict[str, Any]:
+        """Request diary data, renewing an expired session exactly once."""
+        for attempt in range(2):
             async with self._auth.session.get(
                 url,
                 params=params,
@@ -75,12 +85,15 @@ class EmaktabApiClient:
                 },
             ) as response:
                 if response.status in (401, 403):
-                    _LOGGER.warning(
-                        "Authorization error (%s), retrying login",
-                        response.status,
-                    )
-                    await self._auth.async_login()
-                    raise RuntimeError("Authorization failed, re-login required")
+                    if attempt == 0:
+                        _LOGGER.warning(
+                            "Authorization error (%s), renewing session",
+                            response.status,
+                        )
+                        self._auth.invalidate()
+                        await self._auth.async_login()
+                        continue
+                    raise RuntimeError("Authorization failed after re-login")
 
                 if response.status != 200:
                     text = await response.text()
@@ -93,17 +106,13 @@ class EmaktabApiClient:
                         f"Diary API request failed with status {response.status}"
                     )
 
-                data = await response.json()
+                data = await response.json(content_type=None)
+                if not isinstance(data, dict):
+                    raise RuntimeError("Diary API returned an unexpected response")
                 _LOGGER.debug(
                     "eMaktab diary API response received (keys: %s)",
                     list(data.keys()) if isinstance(data, dict) else type(data),
                 )
                 return data
 
-        except aiohttp.ClientError as err:
-            _LOGGER.error("HTTP error during diary API request: %s", err)
-            raise
-
-        except Exception:
-            _LOGGER.exception("Unexpected error during diary API request")
-            raise
+        raise RuntimeError("Diary API request failed")

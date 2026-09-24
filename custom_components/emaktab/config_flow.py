@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import EmaktabApiClient
-from .auth import EmaktabAuthManager
+from .auth import EmaktabAuthenticationError, EmaktabAuthManager
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class EmaktabConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self._validate_input(self.hass, user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except InvalidAuth:
+            except (InvalidAuth, EmaktabAuthenticationError):
                 errors["base"] = "invalid_auth"
             except Exception:
                 _LOGGER.exception("Unexpected error during eMaktab config flow")
@@ -75,20 +75,17 @@ class EmaktabConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data[CONF_USERNAME],
             data[CONF_PASSWORD],
         )
-        await auth.async_login()
-
-        api = EmaktabApiClient(auth)
-
-        # Минимальная проверка — дергаем diary
-        result = await api.async_get_diary(
-            person_id=data[CONF_PERSON_ID],
-            school_id=data[CONF_SCHOOL_ID],
-        )
-
-        if not isinstance(result, dict) or "days" not in result:
-            raise CannotConnect
-
-        await auth.async_close()
+        try:
+            await auth.async_login()
+            api = EmaktabApiClient(auth)
+            result = await api.async_get_diary(
+                person_id=data[CONF_PERSON_ID],
+                school_id=data[CONF_SCHOOL_ID],
+            )
+            if not isinstance(result, dict) or "days" not in result:
+                raise CannotConnect
+        finally:
+            await auth.async_close()
 
 
 class CannotConnect(HomeAssistantError):

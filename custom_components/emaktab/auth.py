@@ -3,21 +3,56 @@
 from __future__ import annotations
 
 import logging
+from html.parser import HTMLParser
 from typing import Optional
+from urllib.parse import urljoin
 
 import aiohttp
-from aiohttp import ClientResponse
 
-from .const import (
-    LOGIN_URL,
-    BASE_URL,
-    USERFEED_URL,
-    COOKIE_AUTH,
-    DEFAULT_USER_AGENT,
-    REQUEST_TIMEOUT,
-)
+from .const import DEFAULT_USER_AGENT, LOGIN_URL, REQUEST_TIMEOUT, USERFEED_URL
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class EmaktabAuthenticationError(RuntimeError):
+    """Raised when eMaktab rejects the supplied credentials."""
+
+
+class _LoginFormParser(HTMLParser):
+    """Extract the login form action and hidden fields without extra dependencies."""
+
+    def __init__(self, base_url: str = LOGIN_URL) -> None:
+        super().__init__()
+        self._base_url = base_url
+        self.action = base_url
+        self.hidden: dict[str, str] = {}
+        self._in_form = False
+        self._form_action = base_url
+        self._form_hidden: dict[str, str] = {}
+        self._has_password = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "form":
+            self._in_form = True
+            self._form_action = self._base_url
+            self._form_hidden = {}
+            self._has_password = False
+            if values.get("action"):
+                self._form_action = urljoin(self._base_url, values["action"])
+        elif tag == "input" and self._in_form:
+            name = values.get("name")
+            if name and values.get("type", "").lower() == "hidden":
+                self._form_hidden[name] = values.get("value") or ""
+            if values.get("type", "").lower() == "password":
+                self._has_password = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "form" and self._in_form:
+            if self._has_password:
+                self.action = self._form_action
+                self.hidden = self._form_hidden
+            self._in_form = False
 
 
 class EmaktabAuthManager:
@@ -27,6 +62,7 @@ class EmaktabAuthManager:
         self._username = username
         self._password = password
         self._session: Optional[aiohttp.ClientSession] = None
+        self._authenticated = False
 
     @property
     def session(self) -> aiohttp.ClientSession:
@@ -37,144 +73,83 @@ class EmaktabAuthManager:
 
     async def async_init_session(self) -> None:
         """Initialize aiohttp session."""
-        if self._session is not None:
+        if self._session is not None and not self._session.closed:
             return
-
-        cookie_jar = aiohttp.CookieJar(unsafe=True)
-
-        timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
         self._session = aiohttp.ClientSession(
-            cookie_jar=cookie_jar,
-            timeout=timeout,
-            headers={
-                "User-Agent": DEFAULT_USER_AGENT,
-            },
+            cookie_jar=aiohttp.CookieJar(unsafe=True),
+            timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+            headers={"User-Agent": DEFAULT_USER_AGENT},
         )
 
-        _LOGGER.debug("HTTP session initialized")
-
     async def async_login(self) -> None:
-        """Perform full login flow."""
+        """Perform the browser login flow and validate the resulting session.
+
+        eMaktab now serves an anti-forgery value on the login page and no longer
+        guarantees the old sequence of two 302 responses.  Fetch and submit the
+        current form and let aiohttp follow the service's redirects instead of
+        depending on those implementation details.
+        """
         await self.async_init_session()
+        self._authenticated = False
+        self.session.cookie_jar.clear()
 
         _LOGGER.info("Starting eMaktab login flow")
-
-        # STEP 1: POST login
-        response = await self._post_login()
-        await self._expect_status(response, 302, "login POST")
-
-        # STEP 2: GET base domain to receive auth cookies
-        response = await self._get_base()
-        await self._expect_status(response, 302, "base GET")
-
-        if not self._has_auth_cookie():
-            raise RuntimeError("Auth cookie not found after base redirect")
-
-        # STEP 3: GET userfeed as validation
-        response = await self._get_userfeed()
-        await self._expect_status(response, 200, "userfeed GET")
-
-        _LOGGER.info("eMaktab login successful")
-
-    async def ensure_logged_in(self) -> None:
-        """Ensure we have a valid authenticated session."""
-        if self._session is None:
-            _LOGGER.debug("No session found, logging in")
-            await self.async_login()
-            return
-
-        if not self._has_auth_cookie():
-            _LOGGER.warning("Auth cookie missing, re-login required")
-            await self.async_login()
-
-    def _has_auth_cookie(self) -> bool:
-        """Check if auth cookie exists in cookie jar."""
-        if self._session is None:
-            return False
-
-        cookies = self._session.cookie_jar.filter_cookies(BASE_URL)
-        return COOKIE_AUTH in cookies
-
-    async def _post_login(self) -> ClientResponse:
-        """Send login POST request."""
-        assert self._session is not None
+        async with self.session.get(LOGIN_URL) as response:
+            if response.status != 200:
+                raise RuntimeError(f"Login page returned status {response.status}")
+            parser = _LoginFormParser(str(response.url))
+            parser.feed(await response.text())
 
         data = {
+            **parser.hidden,
             "login": self._username,
             "password": self._password,
             "exceededAttempts": "False",
-            "ReturnUrl": "",
-            "FingerprintId": "",
+            "ReturnUrl": parser.hidden.get("ReturnUrl", ""),
+            "FingerprintId": parser.hidden.get("FingerprintId", ""),
             "Captcha.Input": "",
-            "Captcha.Id": "",
+            "Captcha.Id": parser.hidden.get("Captcha.Id", ""),
         }
-
         headers = {
-            "Accept": (
-                "text/html,application/xhtml+xml,application/xml;"
-                "q=0.9,image/avif,image/webp,image/apng,*/*;"
-                "q=0.8,application/signed-exchange;v=b3;q=0.7"
-            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Origin": f"{LOGIN_URL.split('/login', 1)[0]}",
             "Referer": LOGIN_URL,
         }
+        async with self.session.post(
+            parser.action, data=data, headers=headers, allow_redirects=True
+        ) as response:
+            await response.read()
+            if response.status >= 400:
+                raise RuntimeError(f"Login request returned status {response.status}")
 
-        _LOGGER.debug("POST login request (browser-like form)")
+        # The cookie name and redirect status are service implementation details.
+        # A protected page is the authoritative test of whether login succeeded.
+        async with self.session.get(USERFEED_URL, allow_redirects=True) as response:
+            await response.read()
+            final_host = response.url.host or ""
+            if response.status in (401, 403) or final_host.startswith("login."):
+                raise EmaktabAuthenticationError("Invalid eMaktab credentials")
+            if response.status != 200:
+                raise RuntimeError(
+                    f"Session validation returned status {response.status}"
+                )
 
-        return await self._session.post(
-            LOGIN_URL,
-            data=data,
-            headers=headers,
-            allow_redirects=False,
-        )
+        self._authenticated = True
+        _LOGGER.info("eMaktab login successful")
 
-    async def _get_base(self) -> ClientResponse:
-        """GET base domain to complete auth cookies."""
-        assert self._session is not None
+    async def ensure_logged_in(self) -> None:
+        """Ensure we have an authenticated session."""
+        if not self._authenticated or self._session is None or self._session.closed:
+            await self.async_login()
 
-        _LOGGER.debug("GET base URL")
-
-        return await self._session.get(
-            BASE_URL,
-            allow_redirects=False,
-        )
-
-    async def _get_userfeed(self) -> ClientResponse:
-        """GET userfeed page to validate session."""
-        assert self._session is not None
-
-        _LOGGER.debug("GET userfeed URL")
-
-        return await self._session.get(
-            USERFEED_URL,
-            allow_redirects=False,
-            headers={
-                "Referer": BASE_URL,
-            },
-        )
-
-    async def _expect_status(
-        self,
-        response: ClientResponse,
-        expected_status: int,
-        step: str,
-    ) -> None:
-        """Validate HTTP response status."""
-        if response.status != expected_status:
-            text = await response.text()
-            _LOGGER.error(
-                "Unexpected status during %s: %s, body=%s",
-                step,
-                response.status,
-                text[:200],
-            )
-            raise RuntimeError(f"Login failed at step: {step}")
-
-        response.release()
+    def invalidate(self) -> None:
+        """Mark the current session as expired."""
+        self._authenticated = False
 
     async def async_close(self) -> None:
         """Close session."""
         if self._session is not None:
             await self._session.close()
             self._session = None
-            _LOGGER.debug("HTTP session closed")
+        self._authenticated = False
