@@ -1,0 +1,51 @@
+name: Publish eMaktab v1.0.10
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-1.0.10.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-v1.0.10
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_COMMIT: 25671766f61afaeac97e0d52ff2e54625188f4e1
+      RELEASE_NOTES: |
+        ## Что изменилось
+        - Исправлены разбор формы входа и повторная авторизация при истечении сессии.
+        - Для настройки теперь нужны только логин и пароль: дети и школы определяются по аккаунту, при нескольких вариантах появляется выбор.
+        - Название конфигурации формируется из имени и фамилии ребёнка.
+        - После перехода в другую школу интеграция может определить новую основную школу, если старая больше не связана с ребёнком и выбор однозначен.
+        - Обновлены документация, переводы и автоматические проверки.
+
+        ## Совместимость и обновление
+        - Существующие конфигурации поддерживаются; пересоздавать их не требуется.
+        - Числовые оценки по 10-балльной системе поддерживаются без пересчёта.
+        - После обновления через HACS перезапустите Home Assistant.
+        - Интервал обновления данных остаётся прежним: один час.
+
+        ## Проверки
+        17 регрессионных тестов, HACS Validate и hassfest прошли успешно для публикуемого коммита.
+    steps:
+      - name: Publish the tested commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.0.10 >/dev/null 2>&1; then
+            echo "Release v1.0.10 already exists."
+            exit 0
+          fi
+          gh release create v1.0.10 \
+            --target "$RELEASE_COMMIT" \
+            --title "eMaktab v1.0.10" \
+            --notes "$RELEASE_NOTES" \
+            --latest
