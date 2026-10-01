@@ -55,16 +55,15 @@ It is an independent, community-developed project.
 
 Configuration is done entirely through the Home Assistant UI.
 
-During setup, the following data is required:
+Enter your eMaktab login and password. The integration discovers the children and schools linked to your account:
 
-- eMaktab login
-- eMaktab password
-- `person_id`
-- `school_id`
+- A single child or school is selected automatically; otherwise, select from the list.
+- The entry name is taken from the child's name.
+- Add a separate entry for each child. No student or school identifiers need to be entered.
 
-If multiple children are available, you can create multiple configuration entries.
+Existing entries remain supported. If an old school returns an empty diary after a transfer, the integration checks the account and uses the new primary school only when it can identify one unambiguously.
 
-> ℹ️ The required identifiers are provided by the eMaktab service for each student.
+Data is refreshed once an hour and when the integration starts. Use **Update eMaktab Data** to refresh all children manually. Numeric marks such as 8 and 10 are supported without conversion to a five-point scale.
 
 ---
 

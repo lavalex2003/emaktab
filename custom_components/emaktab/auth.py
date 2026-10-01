@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from html.parser import HTMLParser
 from typing import Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import aiohttp
 
@@ -30,6 +30,9 @@ class _LoginFormParser(HTMLParser):
         self._form_action = base_url
         self._form_hidden: dict[str, str] = {}
         self._has_password = False
+        self.username_field = "login"
+        self.password_field = "password"
+        self.found = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = dict(attrs)
@@ -38,20 +41,35 @@ class _LoginFormParser(HTMLParser):
             self._form_action = self._base_url
             self._form_hidden = {}
             self._has_password = False
+            self._form_username_field = None
+            self._form_password_field = "password"
             if values.get("action"):
                 self._form_action = urljoin(self._base_url, values["action"])
         elif tag == "input" and self._in_form:
             name = values.get("name")
             if name and values.get("type", "").lower() == "hidden":
                 self._form_hidden[name] = values.get("value") or ""
-            if values.get("type", "").lower() == "password":
+
+            input_type = values.get("type", "text").lower()
+            if (
+                name
+                and input_type in ("email", "text")
+                and self._form_username_field is None
+                and "captcha" not in name.lower()
+            ):
+                self._form_username_field = name
+            if name and input_type == "password":
                 self._has_password = True
+                self._form_password_field = name
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "form" and self._in_form:
             if self._has_password:
+                self.found = True
                 self.action = self._form_action
                 self.hidden = self._form_hidden
+                self.username_field = self._form_username_field or "login"
+                self.password_field = self._form_password_field
             self._in_form = False
 
 
@@ -85,10 +103,8 @@ class EmaktabAuthManager:
     async def async_login(self) -> None:
         """Perform the browser login flow and validate the resulting session.
 
-        eMaktab now serves an anti-forgery value on the login page and no longer
-        guarantees the old sequence of two 302 responses.  Fetch and submit the
-        current form and let aiohttp follow the service's redirects instead of
-        depending on those implementation details.
+        Fetch the current form, preserve its hidden fields, and follow the
+        service redirects rather than assuming a fixed sequence of responses.
         """
         await self.async_init_session()
         self._authenticated = False
@@ -98,23 +114,28 @@ class EmaktabAuthManager:
         async with self.session.get(LOGIN_URL) as response:
             if response.status != 200:
                 raise RuntimeError(f"Login page returned status {response.status}")
-            parser = _LoginFormParser(str(response.url))
+            login_page_url = str(response.url)
+            parser = _LoginFormParser(login_page_url)
             parser.feed(await response.text())
+
+        if not parser.found:
+            raise RuntimeError("Login page does not contain a password form")
 
         data = {
             **parser.hidden,
-            "login": self._username,
-            "password": self._password,
+            parser.username_field: self._username,
+            parser.password_field: self._password,
             "exceededAttempts": "False",
             "ReturnUrl": parser.hidden.get("ReturnUrl", ""),
             "FingerprintId": parser.hidden.get("FingerprintId", ""),
             "Captcha.Input": "",
             "Captcha.Id": parser.hidden.get("Captcha.Id", ""),
         }
+        page_url = urlsplit(login_page_url)
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Origin": f"{LOGIN_URL.split('/login', 1)[0]}",
-            "Referer": LOGIN_URL,
+            "Origin": f"{page_url.scheme}://{page_url.netloc}",
+            "Referer": login_page_url,
         }
         async with self.session.post(
             parser.action, data=data, headers=headers, allow_redirects=True
@@ -128,7 +149,8 @@ class EmaktabAuthManager:
         async with self.session.get(USERFEED_URL, allow_redirects=True) as response:
             await response.read()
             final_host = response.url.host or ""
-            if response.status in (401, 403) or final_host.startswith("login."):
+            protected_host = urlsplit(USERFEED_URL).hostname
+            if response.status in (401, 403) or final_host != protected_host:
                 raise EmaktabAuthenticationError("Invalid eMaktab credentials")
             if response.status != 200:
                 raise RuntimeError(

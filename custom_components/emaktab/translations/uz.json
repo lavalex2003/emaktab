@@ -3,20 +3,34 @@
     "step": {
       "user": {
         "title": "eMaktab’da bolani qo‘shish",
-        "description": "eMaktab elektron kundaligiga ulanish uchun ma’lumotlarni kiriting.",
+        "description": "eMaktab hisobiga kiring, keyin kerak bo‘lsa farzand va maktabni tanlang.",
         "data": {
-          "name": "Bolaning ismi",
           "username": "Login",
-          "password": "Parol",
-          "person_id": "O‘quvchi identifikatori (Person ID)",
-          "school_id": "Maktab identifikatori (School ID)"
+          "password": "Parol"
+        }
+      },
+      "child": {
+        "title": "Farzandni tanlang",
+        "data": {
+          "person_id": "Farzand"
+        }
+      },
+      "school": {
+        "title": "Maktabni tanlang",
+        "data": {
+          "school_id": "Maktab"
         }
       }
     },
     "error": {
       "cannot_connect": "eMaktab bilan ulanish amalga oshmadi",
       "invalid_auth": "Kirish ma’lumotlari noto‘g‘ri",
-      "unknown": "Noma’lum xatolik yuz berdi"
+      "unknown": "Noma’lum xatolik yuz berdi",
+      "no_children": "Hisobda farzandlar va maktablar topilmadi",
+      "invalid_selection": "Ro‘yxatdan variantni tanlang"
+    },
+    "abort": {
+      "already_configured": "Bu farzand allaqachon qo‘shilgan"
     }
   }
 }

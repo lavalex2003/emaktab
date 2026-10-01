@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -19,6 +21,7 @@ class EmaktabApiClient:
 
     def __init__(self, auth: EmaktabAuthManager) -> None:
         self._auth = auth
+        self._resolved_schools: dict[tuple[str, str], str] = {}
 
     @staticmethod
     def _week_range_utc(now: datetime) -> tuple[int, int]:
@@ -53,7 +56,7 @@ class EmaktabApiClient:
 
         params = {
             "personId": person_id,
-            "schoolId": school_id,
+            "schoolId": self._resolved_schools.get((person_id, school_id), school_id),
             "startDate": start_ts,
             "finishDate": finish_ts,
             "timestamp": int(now.timestamp() * 1000),
@@ -67,10 +70,76 @@ class EmaktabApiClient:
         )
 
         try:
-            return await self._async_request_diary(url, params)
+            result = await self._async_request_diary(url, params)
+            if result.get("days") == [] and (person_id, school_id) not in self._resolved_schools:
+                current_school = await self._async_find_current_school(person_id, school_id)
+                if current_school is not None:
+                    params["schoolId"] = current_school
+                    result = await self._async_request_diary(url, params)
+                    self._resolved_schools[(person_id, school_id)] = current_school
+                    _LOGGER.warning(
+                        "Configured eMaktab school is no longer linked to this student; "
+                        "using the current school from the account"
+                    )
+            return result
         except aiohttp.ClientError as err:
             _LOGGER.error("HTTP error during diary API request: %s", err)
             raise
+
+    @staticmethod
+    def _memberships_from_page(page: str) -> list[dict[str, Any]]:
+        """Extract the memberships supplied to the website's diary."""
+        marker = re.search(r'"schoolMemberships"\s*:\s*', page)
+        if marker is None:
+            raise ValueError("School memberships not found")
+        memberships, _ = json.JSONDecoder().raw_decode(page[marker.end():])
+        if not isinstance(memberships, list):
+            raise ValueError("Unexpected school memberships format")
+        return [
+            item for item in memberships
+            if isinstance(item, dict) and item.get("personId") and item.get("schoolId")
+        ]
+
+    async def async_get_memberships(self) -> list[dict[str, Any]]:
+        """Discover children and schools visible to the signed-in account."""
+        await self._auth.ensure_logged_in()
+        async with self._auth.session.get(f"{BASE_URL}/marks") as response:
+            if response.status != 200 or response.url.host != "emaktab.uz":
+                raise RuntimeError("Unable to load account school memberships")
+            return self._memberships_from_page(await response.text())
+
+    @classmethod
+    def _current_school_from_page(
+        cls, page: str, person_id: str, configured_school: str
+    ) -> str | None:
+        """Resolve only an unambiguous primary school for the configured child."""
+        try:
+            memberships = cls._memberships_from_page(page)
+        except ValueError:
+            return None
+        memberships = [
+            item for item in memberships if str(item["personId"]) == str(person_id)
+        ]
+        # An empty week is normal if the configured school is still linked.
+        if any(str(item.get("schoolId")) == str(configured_school) for item in memberships):
+            return None
+        schools = {
+            str(item["schoolId"]) for item in memberships
+            if item.get("isOo") is True and item.get("isOdo") is not True
+            and item.get("schoolId") is not None
+        }
+        return next(iter(schools)) if len(schools) == 1 else None
+
+    async def _async_find_current_school(
+        self, person_id: str, configured_school: str
+    ) -> str | None:
+        """Read the same school memberships used by the website's diary."""
+        async with self._auth.session.get(f"{BASE_URL}/marks") as response:
+            if response.status != 200 or response.url.host != "emaktab.uz":
+                return None
+            return self._current_school_from_page(
+                await response.text(), person_id, configured_school
+            )
 
     async def _async_request_diary(
         self, url: str, params: dict[str, str | int]
@@ -80,11 +149,12 @@ class EmaktabApiClient:
             async with self._auth.session.get(
                 url,
                 params=params,
+                allow_redirects=False,
                 headers={
                     "Referer": f"{BASE_URL}/",
                 },
             ) as response:
-                if response.status in (401, 403):
+                if response.status in (401, 403) or 300 <= response.status < 400:
                     if attempt == 0:
                         _LOGGER.warning(
                             "Authorization error (%s), renewing session",
